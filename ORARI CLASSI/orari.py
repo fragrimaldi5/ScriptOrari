@@ -9,14 +9,14 @@ OUTPUT_DIR = "output_pdf"
 PIE_PATH = "pie_di_pagina.png"
 GIORNI_SETTIMANA = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì"]
 
-SCALE = 3
+SCALE = 2
 A4_WIDTH, A4_HEIGHT = int(827 * SCALE), int(1170 * SCALE) 
 MARGIN = int(40 * SCALE)
 HEADER_H = int(140 * SCALE)
 FOOTER_AREA_H = int(200 * SCALE) 
 CELL_PADDING_PCT = 0.10 
 
-FONT_MAX = 25 * SCALE
+FONT_MAX = 22 * SCALE
 FONT_MIN = 10 * SCALE
 FONT_GIORNI_SIZE = 19 * SCALE 
 THICK_BORDER = 2 * SCALE
@@ -25,7 +25,28 @@ FONT_BOLD = os.path.join("fonts", "arialbd.ttf")
 FONT_REG  = os.path.join("fonts", "arial.ttf")
 FONT_AULA = os.path.join("fonts", "American Captain.ttf")
 
-DARK_COLORS = [(180, 40, 40), (40, 120, 40), (40, 60, 150), (130, 80, 20), (100, 40, 140), (20, 100, 110), (150, 70, 20), (60, 60, 60)]
+DARK_COLORS = [
+    (180, 40, 40),   # 1. Rosso Scuro
+    (40, 120, 40),   # 2. Verde Bosco
+    (40, 60, 150),   # 3. Blu Reale Scuro
+    (130, 80, 20),   # 4. Marrone Dorato
+    (100, 40, 140),  # 5. Viola Profondo
+    (20, 100, 110),  # 6. Ottanio
+    (150, 70, 20),   # 7. Ruggine
+    (60, 60, 60),    # 8. Antracite
+    (0, 51, 102),    # 9. Navy Blue (Blu Notte)
+    (0, 102, 51),    # 10. Verde Pino (Verde molto scuro)
+    (102, 0, 0),     # 11. Amaranto / Bordeaux
+    (102, 51, 0),    # 12. Testa di moro
+    (51, 0, 102),    # 13. Indaco Scuro
+    (0, 102, 102),   # 14. Petrolio
+    (130, 0, 80),    # 15. Vinaccia / Prugna
+    (153, 102, 0),   # 16. Bronzo Scuro / Ocra
+    (51, 102, 153),  # 17. Blu Acciaio
+    (102, 102, 51),  # 18. Verde Oliva Scuro
+    (47, 79, 79),    # 19. Grigio Ardesia Scuro
+    (139, 0, 139)    # 20. Magenta Scuro / Melanzana
+]
 
 # ================= LOGICA DI PULIZIA E FITTING =================
 
@@ -36,10 +57,17 @@ def pulisci_nome_aula(nome):
     nome_pulito = re.sub(r'[^A-Z0-9\s]', ' ', " ".join(parole))
     return " ".join(nome_pulito.split()).strip()
 
-def pulisci_testo_corso(testo):
-    if not isinstance(testo, str) or pd.isna(testo): return ""
-    linee = [l.strip() for l in testo.split('\n') if l.strip() and "---" not in l]
-    return linee[0].strip().upper() if linee else ""
+def clean_string_corso(text):
+    if not text or str(text).lower() == "nan": return ""
+    
+    # 1. Trasforma virgole e asterischi in spazi (come nel tuo originale)
+    text = re.sub(r'[,\*]', ' ', str(text))
+
+    # 2. Tollera le parentesi e i trattini
+    text = re.sub(r'[^a-zA-Z0-9\s\.\(\)\-]', '', text)
+    
+    # 4. Normalizzazione spazi e maiuscolo
+    return " ".join(text.split()).upper()
 
 def abbrevia_parola_piu_lunga(parole):
     """Accorcia la parola più lunga aggiungendo o mantenendo il punto finale."""
@@ -158,12 +186,13 @@ def crea_orario_aula(nome_aula, dati_aula):
     mappa_colori = {}
     for r_idx, ora_s in enumerate(orari_std):
         y_c = HEADER_H + (r_idx + 1) * row_h
-        f_ora = ImageFont.truetype(FONT_REG, int(16 * SCALE))
+        f_ora = ImageFont.truetype(FONT_BOLD, int(16 * SCALE))
         draw.text((MARGIN + (col_w - draw.textlength(ora_s, f_ora))/2, y_c + (row_h - 16*SCALE)/2), ora_s, "black", font=f_ora)
         
         for c_idx, giorno in enumerate(GIORNI_SETTIMANA):
             testo_raw = dati_aula.get(ora_s, {}).get(giorno, "")
-            materia = pulisci_testo_corso(testo_raw)
+            testo_raw = re.split(r' - ', testo_raw)[0]
+            materia = clean_string_corso(testo_raw)
             if materia:
                 if materia not in mappa_colori: mappa_colori[materia] = DARK_COLORS[len(mappa_colori) % len(DARK_COLORS)]
                 p_w, p_h = col_w * (1 - 2*CELL_PADDING_PCT), row_h * (1 - 2*CELL_PADDING_PCT)
@@ -192,40 +221,84 @@ def crea_orario_aula(nome_aula, dati_aula):
         
     return img
 
-# ... (main rimane lo stesso dell'ultima versione funzionante) ...
-
 def main():
+    os.system("cls" if os.name == "nt" else "clear")
+    
     if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
     aule_data = {}
+    
     files = [f for f in os.listdir(INPUT_DIR) if f.lower().endswith(('.xlsx', '.xls'))]
+    
     for f in files:
-        dict_df = pd.read_excel(os.path.join(INPUT_DIR, f), sheet_name=None, header=None)
+        file_path = os.path.join(INPUT_DIR, f)
+        # Leggiamo il file senza header predefinito
+        dict_df = pd.read_excel(file_path, sheet_name=None, header=None)
+        
         for sheet_name, df in dict_df.items():
             giorno = next((g for g in GIORNI_SETTIMANA if g in sheet_name.lower()), None)
             if not giorno: continue
-            h_row = next((i for i, r in df.iterrows() if r.astype(str).str.contains('Aula|Laboratorio|Spazio', case=False).any()), -1)
-            if h_row == -1: continue
-            df.columns = df.iloc[h_row]
-            df = df.iloc[h_row+1:].reset_index(drop=True)
-            col_ora = df.columns[0]
-            col_aule = [c for c in df.columns if any(w in str(c) for w in ["Aula", "Laboratorio", "Spazio"])]
-            for _, row in df.iterrows():
-                if pd.isna(row[col_ora]): continue
-                ora_n = re.sub(r'[^0-9\-:]', '', str(row[col_ora])).replace('.', ':')
-                for a_col in col_aule:
-                    a_key = str(a_col).strip()
-                    if a_key not in aule_data: aule_data[a_key] = {}
-                    if ora_n not in aule_data[a_key]: aule_data[a_key][ora_n] = {}
-                    if pd.notna(row[a_col]): aule_data[a_key][ora_n][giorno] = str(row[a_col])
+            
+            # --- IDENTIFICAZIONE RIGA ORARIO E RIGA AULE ---
+            idx_830 = -1
+            for i, r in df.iterrows():
+                row_str = " ".join(r.astype(str).str.lower().values)
+                if "08:30" in row_str or "08.30" in row_str or "8:30" in row_str:
+                    idx_830 = i
+                    break
+            
+            # Se troviamo l'orario, la riga sopra (idx_830 - 1) contiene i nomi delle aule
+            if idx_830 <= 0: continue 
 
+            h_row_aule = idx_830 - 1
+            nomi_aule = df.iloc[h_row_aule]
+            
+            # I dati iniziano dalla riga dell'orario 08:30
+            df_dati = df.iloc[idx_830:].reset_index(drop=True)
+            df_dati.columns = nomi_aule # Assegniamo i nomi (L8, ecc.) come testata
+            
+            # La prima colonna è l'ORARIO, le altre sono le AULE
+            col_ora = df_dati.columns[0]
+            col_aule = [c for c in df_dati.columns[1:] if pd.notna(c) and "unnamed" not in str(c).lower()]
+            
+            for _, row in df_dati.iterrows():
+                ora_raw = str(row[col_ora]).strip()
+                # Consideriamo solo righe con intervallo orario (es. 08:30-09:30)
+                if not ora_raw or '-' not in ora_raw or ora_raw.lower() == 'nan':
+                    continue
+                
+                ora_n = re.sub(r'[^0-9\-:]', '', ora_raw).replace('.', ':')
+                
+                for a_col in col_aule:
+                    valore = row[a_col]
+                    # Saltiamo celle vuote
+                    if pd.isna(valore) or str(valore).strip().lower() in ['nan', '']:
+                        continue
+                    
+                    a_key = str(a_col).strip().upper()
+                    
+                    if a_key not in aule_data:
+                        aule_data[a_key] = {}
+                    if ora_n not in aule_data[a_key]:
+                        aule_data[a_key][ora_n] = {}
+                    
+                    # Salviamo la lezione per quel giorno e quell'ora
+                    # estrai_dati_cella si occuperà di pulire il testo e filtrare i duplicati
+                    aule_data[a_key][ora_n][giorno] = str(valore)
+
+    # --- GENERAZIONE PDF ---
     pagine = []
-    for a in sorted(aule_data.keys()):
-        print(f"Rendering: {pulisci_nome_aula(a)}")
-        pagine.append(crea_orario_aula(a, aule_data[a]).convert("RGB"))
+    for a_nome in sorted(aule_data.keys()):
+        print(f"Rendering aula: {a_nome}")
+        try:
+            img_pag = crea_orario_aula(a_nome, aule_data[a_nome])
+            pagine.append(img_pag.convert("RGB"))
+        except Exception as e:
+            print(f"Errore rendering {a_nome}: {e}")
 
     if pagine:
-        pagine[0].save(os.path.join(OUTPUT_DIR, "Orario_Aule_Finale.pdf"), save_all=True, append_images=pagine[1:])
-        print("Operazione completata con successo!")
+        pagine[0].save(os.path.join(OUTPUT_DIR, "Orario_Aule_Completo.pdf"), 
+                       save_all=True, append_images=pagine[1:])
+        print(f"\nSuccesso! Generate {len(pagine)} aule nel PDF finale.")
 
 if __name__ == "__main__":
     main()

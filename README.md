@@ -28,3 +28,6 @@ Nel caso dei gruppi classe, c'è la possibilità di indicare più folgi excel pe
 
 ORARIO CLASSI
 In questo caso è sufficiente fornire solo i fogli excel degli edifici desiderati poichè la generazione degli orari avviene in una modalità più semplice 
+
+MERGER ORARI
+Si tratta di uno script che serve a generare un file excel nel formato classico di un excel che dovrebbe contenere l'orario di tutte le aule di ingegneria. Gli si deve copiare nella cartella di input tutti gli orari delle classi di ingegneria in formato excel e verrà generato un file excel diviso con gli orari per aula, non più per corso. SI PUO' COPIARE DIRETTAMENTE LA CARTELLA DI INPUT DI 'ORARI GRUPPI' PER GARANTIRE UN LAVORO COERENTE CON LE FOTO PROFILO DEI GRUPPI
