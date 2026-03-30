@@ -81,8 +81,16 @@ def svuota_cartella(directory):
 
 def clean_string(text):
     if not text or str(text).lower() == "nan": return ""
-    text = re.sub(r"[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ\s\.']", " ", str(text))
+    
+    # 1. Convertiamo in stringa e prendiamo solo ciò che c'è prima di " - "
+    # split(" - ") divide la stringa in una lista; [0] prende il primo elemento.
+    text = str(text).split(" - ")[0]
+    
+    # 2. Applichiamo la pulizia tramite espressioni regolari
+    text = re.sub(r"[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ\s\.']", " ", text)
     text = re.sub(r"\s+[-']\s+", " ", text)
+    
+    # 3. Normalizzazione spazi e conversione in maiuscolo
     return " ".join(text.split()).upper()
 
 def get_font(path, size):
