@@ -81,7 +81,7 @@ def svuota_cartella(directory):
 
 def clean_string(text):
     if not text or str(text).lower() == "nan": return ""
-    text = re.sub(r"[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ\s\.\-']", " ", str(text))
+    text = re.sub(r"[^a-zA-Z0-9àèéìòùÀÈÉÌÒÙ\s\.']", " ", str(text))
     text = re.sub(r"\s+[-']\s+", " ", text)
     return " ".join(text.split()).upper()
 
