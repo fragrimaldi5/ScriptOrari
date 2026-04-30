@@ -2,7 +2,6 @@ import os
 import pandas as pd
 
 # ================= CONFIGURAZIONE =================
-# Cartella che contiene i file orari (entrerà anche nelle sottocartelle)
 INPUT_DIR = "input_excel" 
 OUTPUT_FILE = "Orario_per_Aule_Completo.xlsx"
 
@@ -14,17 +13,9 @@ ORARI = [
 ]
 
 def trova_tabella_dati(df_raw):
-    """
-    Cerca la riga di intestazione nel foglio 'Lista'.
-    Restituisce il DataFrame con le colonne corrette partendo dalla riga trovata.
-    """
     for i, row in df_raw.iterrows():
-        # Converte i valori della riga in stringhe minuscole per il confronto
         row_values = [str(val).strip().lower() for val in row.values]
-        
-        # Cerchiamo la riga che contiene i capisaldi della tabella
         if 'giorno' in row_values and 'ora' in row_values and 'aula' in row_values:
-            # Abbiamo trovato la riga degli header
             headers = [str(h).strip() for h in row.values]
             df_pulito = df_raw.iloc[i+1:].copy()
             df_pulito.columns = headers
@@ -32,7 +23,7 @@ def trova_tabella_dati(df_raw):
     return None
 
 def genera_orario():
-    # Struttura: {giorno: {ora: {aula: nome_corso}}}
+    # Struttura modificata: {giorno: {ora: {aula: (nome_corso, nome_file)}}}
     database = {g: {o: {} for o in ORARI} for g in GIORNI}
     tutte_le_aule = set()
 
@@ -55,58 +46,56 @@ def genera_orario():
                         ora_raw = str(row.get('Ora', '')).strip()
                         aula_raw = str(row.get('Aula', '')).strip()
                         
-                        # --- MODIFICA QUI ---
-                        # Prendiamo il valore, lo convertiamo in stringa e 
-                        # teniamo solo la prima riga prima del carattere \n
                         cella_intero = str(row.get('Nome insegnamento', ''))
+                        if cella_intero.lower() in ['nan', 'none', '']:
+                            continue
+                            
                         nome_corso = cella_intero.split('\n')[0].strip()
-                        # --------------------
 
                         if giorno_raw in database and ora_raw in ORARI:
                             if aula_raw not in ["nan", "", "None"]:
                                 tutte_le_aule.add(aula_raw)
                                 
+                                # Verifichiamo se l'aula è già occupata
                                 if aula_raw not in database[giorno_raw][ora_raw]:
-                                    database[giorno_raw][ora_raw][aula_raw] = nome_corso
+                                    # Salviamo una tupla con (Nome Corso, Nome File)
+                                    database[giorno_raw][ora_raw][aula_raw] = (nome_corso, file)
                                 else:
-                                    corso_esistente = database[giorno_raw][ora_raw][aula_raw]
+                                    corso_esistente, file_esistente = database[giorno_raw][ora_raw][aula_raw]
+                                    
                                     if corso_esistente != nome_corso:
-                                        print(f"  [Conflitto] {aula_raw} il {giorno_raw} alle {ora_raw}: {nome_corso} vs {corso_esistente}")
+                                        print(f"\n⚠️ [CONFLITTO] Aula: {aula_raw} | {giorno_raw} {ora_raw}")
+                                        print(f"   - GIÀ OCCUPATA DA: '{corso_esistente}' (File: {file_esistente})")
+                                        print(f"   - TENTATIVO DI:    '{nome_corso}' (File: {file})")
 
                 except Exception as e:
-                    print(f"  [ERRORE] Impossibile leggere {file}: {e}")
+                    print(f"   [ERRORE] Impossibile leggere {file}: {e}")
 
-    # 2. Scrittura del file Excel finale
     if not tutte_le_aule:
-        print("\nATTENZIONE: Nessun dato trovato. Controlla che i file abbiano un foglio chiamato 'Lista'.")
+        print("\nATTENZIONE: Nessun dato trovato.")
         return
 
-    # Ordiniamo le aule alfabeticamente per le colonne
     aule_ordinate = sorted(list(tutte_le_aule))
     
     with pd.ExcelWriter(OUTPUT_FILE, engine='openpyxl') as writer:
         for giorno in GIORNI:
-            # Creiamo il DataFrame per ogni foglio
             df_giorno = pd.DataFrame(index=ORARI, columns=aule_ordinate)
-            
             for ora in ORARI:
                 for aula in aule_ordinate:
-                    # Recupera il nome originale del corso o lascia vuoto
-                    df_giorno.at[ora, aula] = database[giorno][ora].get(aula, "")
+                    # Estraiamo solo il nome del corso (indice 0 della tupla)
+                    dati = database[giorno][ora].get(aula)
+                    df_giorno.at[ora, aula] = dati[0] if dati else ""
             
-            # Scrittura nel foglio (es. Lunedì, Martedì...)
             df_giorno.to_excel(writer, sheet_name=giorno.capitalize())
 
     print(f"\n{'-'*50}")
     print(f"COMPLETATO!")
     print(f"File generato: {OUTPUT_FILE}")
-    print(f"File totali censiti: {len(aule_ordinate)}")
     print(f"{'-'*50}")
 
 if __name__ == "__main__":
-    # Verifica esistenza cartella input
     if not os.path.exists(INPUT_DIR):
         os.makedirs(INPUT_DIR)
-        print(f"Creata cartella '{INPUT_DIR}'. Inserisci i file Excel e riavvia lo script.")
+        print(f"Creata cartella '{INPUT_DIR}'.")
     else:
         genera_orario()
